@@ -1415,6 +1415,8 @@ vty_clear_prefix_list (struct vty *vty, afi_t afi, const char *name,
 
 #include "plist_clippy.c"
 
+VTYSH_TARGETS(VTYSH_RIPD|VTYSH_OSPFD|VTYSH_BGPD|VTYSH_ZEBRA|VTYSH_PIMD)
+
 DEFPY (ip_prefix_list,
        ip_prefix_list_cmd,
        "ip prefix-list WORD [seq (1-4294967295)] <deny|permit>$action A.B.C.D/M$dest [{ge (0-32)|le (0-32)}]",
@@ -1696,6 +1698,8 @@ DEFUN (clear_ip_prefix_list_name_prefix,
   int idx_ipv4_prefixlen = 4;
   return vty_clear_prefix_list (vty, AFI_IP, argv[idx_word]->arg, argv[idx_ipv4_prefixlen]->arg);
 }
+
+VTYSH_TARGETS(VTYSH_RIPNGD|VTYSH_OSPF6D|VTYSH_BGPD|VTYSH_ZEBRA)
 
 DEFUN (ipv6_prefix_list,
        ipv6_prefix_list_cmd,

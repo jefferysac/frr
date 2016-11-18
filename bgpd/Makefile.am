@@ -1,6 +1,8 @@
 ## Process this file with automake to produce Makefile.in.
 AUTOMAKE_OPTIONS = subdir-objects
 
+include ../common.am
+
 if ENABLE_BGP_VNC
 #o file to keep linker happy
 BGP_VNC_RFP_LIB=rfapi/rfapi_descriptor_rfp_utils.o @top_builddir@/$(LIBRFP)/librfp.a 
@@ -104,6 +106,9 @@ bgp_btoa_LDFLAGS = $(BGP_VNC_RFP_LD_FLAGS)
 examplesdir = $(exampledir)
 dist_examples_DATA = bgpd.conf.sample bgpd.conf.sample2 \
 	bgpd.conf.vnc.sample
+
+bgp_vty.o: bgp_vty_clippy.c
+bgp_debug.o: bgp_debug_clippy.c
 
 EXTRA_DIST = BGP4-MIB.txt
 

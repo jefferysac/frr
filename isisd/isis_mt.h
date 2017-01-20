@@ -96,4 +96,6 @@ struct isis_circuit_mt_setting* circuit_get_mt_setting(
                                                 struct isis_circuit *circuit,
                                                 uint16_t mtid);
 int circuit_write_mt_settings(struct isis_circuit *circuit, struct vty *vty);
+struct isis_circuit_mt_setting** circuit_mt_settings(struct isis_circuit *circuit,
+                                                     unsigned int *mt_count);
 #endif

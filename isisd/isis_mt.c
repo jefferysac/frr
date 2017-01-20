@@ -310,3 +310,46 @@ circuit_write_mt_settings(struct isis_circuit *circuit, struct vty *vty)
     }
   return written;
 }
+
+struct isis_circuit_mt_setting**
+circuit_mt_settings(struct isis_circuit *circuit, unsigned int *mt_count)
+{
+  static unsigned int size = 0;
+  static struct isis_circuit_mt_setting **rv = NULL;
+
+  struct isis_area_mt_setting **area_settings;
+  unsigned int area_count;
+
+  unsigned int count = 0;
+
+  struct listnode *node;
+  struct isis_circuit_mt_setting *setting;
+
+  area_settings = area_mt_settings(circuit->area, &area_count);
+
+  for (unsigned int i = 0; i < area_count; i++)
+    {
+      for (ALL_LIST_ELEMENTS_RO(circuit->mt_settings, node, setting))
+        {
+          if (setting->mtid != area_settings[i]->mtid)
+            continue;
+          break;
+        }
+      if (!setting)
+        setting = circuit_get_mt_setting(circuit, area_settings[i]->mtid);
+
+      if (!setting->enabled)
+        continue;
+
+      count++;
+      if (count > size)
+        {
+          rv = XREALLOC(MTYPE_TMP, rv, count * sizeof(*rv));
+          size = count;
+        }
+      rv[count-1] = setting;
+    }
+
+  *mt_count = count;
+  return rv;
+}

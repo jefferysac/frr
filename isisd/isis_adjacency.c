@@ -148,6 +148,8 @@ isis_delete_adj (void *arg)
   if (adj->ipv6_addrs)
     list_delete (adj->ipv6_addrs);
 
+  adj_mt_finish(adj);
+
   XFREE (MTYPE_ISIS_ADJACENCY, adj);
   return;
 }

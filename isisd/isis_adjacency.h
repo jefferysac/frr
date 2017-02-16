@@ -97,6 +97,8 @@ struct isis_adjacency
   int flaps;			/* number of adjacency flaps  */
   struct thread *t_expire;	/* expire after hold_time  */
   struct isis_circuit *circuit;	/* back pointer */
+  uint16_t *mt_set;             /* Topologies this adjacency is valid for */
+  unsigned int mt_count;              /* Number of entries in mt_set */
 };
 
 struct isis_adjacency *isis_adj_lookup (const u_char * sysid, struct list *adjdb);

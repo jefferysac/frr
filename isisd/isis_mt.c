@@ -24,14 +24,19 @@
 #include "isisd/isisd.h"
 #include "isisd/isis_memory.h"
 #include "isisd/isis_circuit.h"
+#include "isisd/isis_adjacency.h"
+#include "isisd/isis_tlv.h"
 #include "isisd/isis_mt.h"
 
 DEFINE_MTYPE_STATIC(ISISD, MT_AREA_SETTING, "ISIS MT Area Setting")
 DEFINE_MTYPE_STATIC(ISISD, MT_CIRCUIT_SETTING, "ISIS MT Circuit Setting")
+DEFINE_MTYPE_STATIC(ISISD, MT_ADJ_INFO, "ISIS MT Adjacency Info")
 
 /* MT naming api */
 const char *isis_mtid2str(uint16_t mtid)
 {
+  static char buf[sizeof("65535")];
+
   switch(mtid)
     {
       case ISIS_MT_IPV4_UNICAST:
@@ -47,7 +52,8 @@ const char *isis_mtid2str(uint16_t mtid)
       case ISIS_MT_IPV6_MGMT:
         return "ipv6-mgmt";
       default:
-        return NULL;
+        snprintf(buf, sizeof(buf), "%" PRIu16, mtid);
+        return buf;
     }
 }
 
@@ -352,4 +358,55 @@ circuit_mt_settings(struct isis_circuit *circuit, unsigned int *mt_count)
 
   *mt_count = count;
   return rv;
+}
+
+static void adj_mt_set(struct isis_adjacency *adj, unsigned int index,
+                       uint16_t mtid)
+{
+  if (adj->mt_count < index + 1)
+    {
+      adj->mt_set = XREALLOC(MTYPE_MT_ADJ_INFO, adj->mt_set,
+                             (index + 1) * sizeof(*adj->mt_set));
+      adj->mt_count = index + 1;
+    }
+  adj->mt_set[index] = mtid;
+}
+
+void
+tlvs_to_adj_mt_set(struct tlvs *tlvs, bool v4_usable, bool v6_usable,
+                   struct isis_adjacency *adj)
+{
+  struct isis_circuit_mt_setting **mt_settings;
+  unsigned int circuit_mt_count;
+
+  unsigned int intersect_count = 0;
+
+  mt_settings = circuit_mt_settings(adj->circuit, &circuit_mt_count);
+  for (unsigned int i = 0; i < circuit_mt_count; i++)
+    {
+      if (!tlvs->mt_router_info)
+        {
+          /* Other end does not have MT enabled */
+          if (mt_settings[i]->mtid == ISIS_MT_IPV4_UNICAST)
+            adj_mt_set(adj, intersect_count++, ISIS_MT_IPV4_UNICAST);
+        }
+      else
+        {
+          struct listnode *node;
+          struct mt_router_info *info;
+          for (ALL_LIST_ELEMENTS_RO(tlvs->mt_router_info, node, info))
+            {
+              if (mt_settings[i]->mtid == info->mtid)
+                adj_mt_set(adj, intersect_count++, info->mtid);
+            }
+        }
+    }
+  adj->mt_count = intersect_count;
+}
+
+void
+adj_mt_finish(struct isis_adjacency *adj)
+{
+  XFREE(MTYPE_MT_ADJ_INFO, adj->mt_set);
+  adj->mt_count = 0;
 }

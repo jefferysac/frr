@@ -171,11 +171,65 @@ area_write_mt_settings(struct isis_area *area, struct vty *vty)
       const char *name = isis_mtid2str(setting->mtid);
       if (name && setting->enabled)
         {
+          if (setting->mtid == ISIS_MT_IPV4_UNICAST)
+            continue; /* always enabled, no need to write out config */
           vty_out (vty, " topology %s%s", name, VTY_NEWLINE);
           written++;
         }
     }
   return written;
+}
+
+bool area_is_mt(struct isis_area *area)
+{
+  struct listnode *node, *node2;
+  struct isis_area_mt_setting *setting;
+  struct isis_circuit *circuit;
+  struct isis_circuit_mt_setting *csetting;
+
+  for (ALL_LIST_ELEMENTS_RO(area->mt_settings, node, setting))
+    {
+      if (setting->enabled && setting->mtid != ISIS_MT_IPV4_UNICAST)
+        return true;
+    }
+  for (ALL_LIST_ELEMENTS_RO(area->circuit_list, node, circuit))
+    {
+      for (ALL_LIST_ELEMENTS_RO(circuit->mt_settings, node2, csetting))
+        {
+          if (!csetting->enabled && csetting->mtid == ISIS_MT_IPV4_UNICAST)
+            return true;
+        }
+    }
+
+  return false;
+}
+
+struct isis_area_mt_setting**
+area_mt_settings(struct isis_area *area, unsigned int *mt_count)
+{
+  static unsigned int size = 0;
+  static struct isis_area_mt_setting **rv = NULL;
+
+  unsigned int count = 0;
+  struct listnode *node;
+  struct isis_area_mt_setting *setting;
+
+  for (ALL_LIST_ELEMENTS_RO(area->mt_settings, node, setting))
+    {
+      if (!setting->enabled)
+        continue;
+
+      count++;
+      if (count > size)
+        {
+          rv = XREALLOC(MTYPE_TMP, rv, count * sizeof(*rv));
+          size = count;
+        }
+      rv[count-1] = setting;
+    }
+
+  *mt_count = count;
+  return rv;
 }
 
 /* Circuit specific MT settings api */

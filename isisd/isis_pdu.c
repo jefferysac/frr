@@ -471,6 +471,7 @@ process_p2p_hello (struct isis_circuit *circuit)
   expected |= TLVFLAG_NLPID;
   expected |= TLVFLAG_IPV4_ADDR;
   expected |= TLVFLAG_IPV6_ADDR;
+  expected |= TLVFLAG_MT_ROUTER_INFORMATION;
 
   auth_tlv_offset = stream_get_getp (circuit->rcv_stream);
   retval = parse_tlvs (circuit->area->area_tag,
@@ -1021,6 +1022,7 @@ process_lan_hello (int level, struct isis_circuit *circuit, const u_char *ssnpa)
   expected |= TLVFLAG_NLPID;
   expected |= TLVFLAG_IPV4_ADDR;
   expected |= TLVFLAG_IPV6_ADDR;
+  expected |= TLVFLAG_MT_ROUTER_INFORMATION;
 
   auth_tlv_offset = stream_get_getp (circuit->rcv_stream);
   retval = parse_tlvs (circuit->area->area_tag,

@@ -1395,7 +1395,11 @@ isis_circuit_mt_enabled_set (struct isis_circuit *circuit, uint16_t mtid,
   struct isis_circuit_mt_setting *setting;
 
   setting = circuit_get_mt_setting(circuit, mtid);
-  setting->enabled = enabled;
+  if (setting->enabled != enabled)
+    {
+      setting->enabled = enabled;
+      lsp_regenerate_schedule (circuit->area, IS_LEVEL_1 | IS_LEVEL_2, 0);
+    }
 
   return CMD_SUCCESS;
 }

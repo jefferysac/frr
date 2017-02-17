@@ -319,7 +319,11 @@ area_set_mt_enabled(struct vty *vty, uint16_t mtid, bool enabled)
   struct isis_area_mt_setting *setting;
 
   setting = area_get_mt_setting(area, mtid);
-  setting->enabled = enabled;
+  if (setting->enabled != enabled)
+    {
+      setting->enabled = enabled;
+      lsp_regenerate_schedule (area, IS_LEVEL_1 | IS_LEVEL_2, 0);
+    }
 
   return CMD_SUCCESS;
 }

@@ -43,6 +43,7 @@
 #include "isisd/isis_pdu.h"
 #include "isisd/isis_lsp.h"
 #include "isisd/isis_te.h"
+#include "isisd/isis_mt.h"
 
 void
 free_tlv (void *val)
@@ -67,6 +68,8 @@ free_tlvs (struct tlvs *tlvs)
     list_delete (tlvs->is_neighs);
   if (tlvs->te_is_neighs)
     list_delete (tlvs->te_is_neighs);
+  if (tlvs->mt_is_neighs)
+    list_delete (tlvs->mt_is_neighs);
   if (tlvs->es_neighs)
     list_delete (tlvs->es_neighs);
   if (tlvs->lsp_entries)
@@ -946,26 +949,44 @@ tlv_add_is_neighs (struct list *is_neighs, struct stream *stream)
   return add_tlv (IS_NEIGHBOURS, pos - value, value, stream);
 }
 
-int
-tlv_add_te_is_neighs (struct list *te_is_neighs, struct stream *stream)
+static size_t
+max_tlv_size(struct stream *stream)
+{
+  size_t avail = stream_get_size (stream) - stream_get_endp(stream);
+
+  if (avail < 2)
+    return 0;
+
+  if (avail < 257)
+    return avail - 2;
+
+  return 255;
+}
+
+unsigned int
+tlv_add_te_is_neighs (struct list *te_is_neighs, struct stream *stream, void *arg)
 {
   struct listnode *node;
   struct te_is_neigh *te_is_neigh;
   u_char value[255];
   u_char *pos = value;
-  int retval;
+  uint16_t mtid = arg ? *(uint16_t*)arg : ISIS_MT_IPV4_UNICAST;
+  unsigned int consumed = 0;
+  size_t max_size = max_tlv_size(stream);
+
+  if (mtid != ISIS_MT_IPV4_UNICAST)
+    {
+      uint16_t mtid_conversion = ntohs(mtid);
+      memcpy(pos, &mtid_conversion, sizeof(mtid_conversion));
+      pos += sizeof(mtid_conversion);
+    }
 
   for (ALL_LIST_ELEMENTS_RO (te_is_neighs, node, te_is_neigh))
     {
       /* FIXME: Check if Total SubTLVs size doesn't exceed 255 */
-      if (pos - value + IS_NEIGHBOURS_LEN + te_is_neigh->sub_tlvs_length > 255)
-        {
-          retval = add_tlv (TE_IS_NEIGHBOURS, pos - value, value, stream);
-          if (retval != ISIS_OK)
-            return retval;
-          pos = value;
-        }
-      
+      if ((size_t)(pos - value) + IS_NEIGHBOURS_LEN + te_is_neigh->sub_tlvs_length > max_size)
+        break;
+
       memcpy (pos, te_is_neigh->neigh_id, ISIS_SYS_ID_LEN + 1);
       pos += ISIS_SYS_ID_LEN + 1;
       memcpy (pos, te_is_neigh->te_metric, 3);
@@ -979,9 +1000,17 @@ tlv_add_te_is_neighs (struct list *te_is_neighs, struct stream *stream)
           memcpy (pos, te_is_neigh->sub_tlvs, te_is_neigh->sub_tlvs_length);
           pos += te_is_neigh->sub_tlvs_length;
         }
+      consumed++;
     }
 
-  return add_tlv (TE_IS_NEIGHBOURS, pos - value, value, stream);
+  if (consumed)
+    {
+      int rv = add_tlv ((mtid != ISIS_MT_IPV4_UNICAST) ? MT_IS_NEIGHBOURS
+                                                       : TE_IS_NEIGHBOURS,
+                        pos - value, value, stream);
+      assert(rv == ISIS_OK);
+    }
+  return consumed;
 }
 
 int

@@ -1038,6 +1038,42 @@ lsp_print_all (struct vty *vty, dict_t * lspdb, char detail, char dynhost)
   return lsp_count;
 }
 
+static void
+_lsp_tlv_fit (struct isis_lsp *lsp, struct list **from, struct list **to,
+              int frag_thold,
+              unsigned int tlv_build_func (struct list *, struct stream *,
+                                           void *arg),
+              void *arg)
+{
+  while (*from && listcount(*from))
+    {
+      unsigned int count;
+
+      count = tlv_build_func(*from, lsp->pdu, arg);
+
+      if (listcount(*to) != 0 || count != listcount(*from))
+        {
+          struct listnode *node, *nnode;
+          void *elem;
+
+          for (ALL_LIST_ELEMENTS(*from, node, nnode, elem))
+            {
+              if (!count)
+                break;
+              listnode_add (*to, elem);
+              list_delete_node (*from, node);
+              --count;
+            }
+        }
+      else
+        {
+          list_free (*to);
+          *to = *from;
+          *from = NULL;
+        }
+    }
+}
+
 #define FRAG_THOLD(S,T) \
   ((STREAM_SIZE(S)*T)/100)
 
@@ -1635,10 +1671,8 @@ lsp_build (struct isis_lsp *lsp, struct isis_area *area)
                         /* Or keep only TE metric with no SubTLVs if MPLS_TE is off */
                         te_is_neigh->sub_tlvs_length = 0;
 
-                      listnode_add (tlv_data.te_is_neighs, te_is_neigh);
-                      lsp_debug("ISIS (%s): Adding DIS %s.%02x as te-style neighbor",
-                                area->area_tag, sysid_print(te_is_neigh->neigh_id),
-                                LSP_PSEUDO_ID(te_is_neigh->neigh_id));
+                      tlvs_add_mt_bcast(&tlv_data, circuit, level, te_is_neigh);
+                      XFREE(MTYPE_ISIS_TLV, te_is_neigh);
                     }
 		}
 	    }
@@ -1695,9 +1729,9 @@ lsp_build (struct isis_lsp *lsp, struct isis_area *area)
                   else
                     /* Or keep only TE metric with no SubTLVs if MPLS_TE is off */
                     te_is_neigh->sub_tlvs_length = 0;
-		  listnode_add (tlv_data.te_is_neighs, te_is_neigh);
-		  lsp_debug("ISIS (%s): Adding te-style is reach for %s", area->area_tag,
-                            sysid_print(te_is_neigh->neigh_id));
+
+                  tlvs_add_mt_p2p(&tlv_data, circuit, te_is_neigh);
+                  XFREE(MTYPE_ISIS_TLV, te_is_neigh);
 		}
 	    }
           else
@@ -1789,13 +1823,31 @@ lsp_build (struct isis_lsp *lsp, struct isis_area *area)
     {
       if (lsp->tlv_data.te_is_neighs == NULL)
 	lsp->tlv_data.te_is_neighs = list_new ();
-      lsp_tlv_fit (lsp, &tlv_data.te_is_neighs, &lsp->tlv_data.te_is_neighs,
-		   IS_NEIGHBOURS_LEN, area->lsp_frag_threshold,
-		   tlv_add_te_is_neighs);
+      _lsp_tlv_fit (lsp, &tlv_data.te_is_neighs, &lsp->tlv_data.te_is_neighs,
+		    area->lsp_frag_threshold, tlv_add_te_is_neighs, NULL);
       if (tlv_data.te_is_neighs && listcount (tlv_data.te_is_neighs))
 	lsp = lsp_next_frag (LSP_FRAGMENT (lsp->lsp_header->lsp_id) + 1,
 			     lsp0, area, level);
     }
+
+  struct tlv_mt_neighbors *mt_neighs;
+  for (ALL_LIST_ELEMENTS_RO(tlv_data.mt_is_neighs, node, mt_neighs))
+    {
+      while (mt_neighs->list && listcount(mt_neighs->list))
+        {
+          struct tlv_mt_neighbors *frag_mt_neighs;
+
+          frag_mt_neighs = tlvs_get_mt_neighbors(&lsp->tlv_data, mt_neighs->mtid);
+          _lsp_tlv_fit (lsp, &mt_neighs->list, &frag_mt_neighs->list,
+                        area->lsp_frag_threshold, tlv_add_te_is_neighs,
+                        &mt_neighs->mtid);
+          if (mt_neighs->list && listcount(mt_neighs->list))
+            lsp = lsp_next_frag (LSP_FRAGMENT (lsp->lsp_header->lsp_id) + 1,
+                                 lsp0, area, level);
+        }
+    }
+
+
   lsp->lsp_header->pdu_len = htons (stream_get_endp (lsp->pdu));
 
   free_tlvs (&tlv_data);
@@ -2232,7 +2284,7 @@ lsp_build_pseudo (struct isis_lsp *lsp, struct isis_circuit *circuit,
     tlv_add_is_neighs (lsp->tlv_data.is_neighs, lsp->pdu);
 
   if (lsp->tlv_data.te_is_neighs && listcount (lsp->tlv_data.te_is_neighs) > 0)
-    tlv_add_te_is_neighs (lsp->tlv_data.te_is_neighs, lsp->pdu);
+    tlv_add_te_is_neighs (lsp->tlv_data.te_is_neighs, lsp->pdu, NULL);
 
   if (lsp->tlv_data.es_neighs && listcount (lsp->tlv_data.es_neighs) > 0)
     tlv_add_is_neighs (lsp->tlv_data.es_neighs, lsp->pdu);

@@ -829,6 +829,37 @@ lsp_print (struct isis_lsp *lsp, struct vty *vty, char dynhost)
            lsp_bits2string (&lsp->lsp_header->lsp_bits), VTY_NEWLINE);
 }
 
+static void
+lsp_print_mt_reach(struct list *list, struct vty *vty,
+                   char dynhost, uint16_t mtid)
+{
+  struct listnode *node;
+  struct te_is_neigh *neigh;
+
+  if (!list)
+    return;
+
+  for (ALL_LIST_ELEMENTS_RO (list, node, neigh))
+    {
+      u_char lspid[255];
+
+      lspid_print(neigh->neigh_id, lspid, dynhost, 0);
+      if (mtid == ISIS_MT_IPV4_UNICAST)
+        {
+          vty_out(vty, "  Metric      : %-8d IS-Extended   : %s%s",
+                  GET_TE_METRIC(neigh), lspid, VTY_NEWLINE);
+        }
+      else
+        {
+          vty_out(vty, "  Metric      : %-8d MT-Reach      : %s %s%s",
+                  GET_TE_METRIC(neigh), lspid,
+                  isis_mtid2str(mtid), VTY_NEWLINE);
+        }
+      if (IS_MPLS_TE(isisMplsTE))
+        mpls_te_print_detail(vty, neigh);
+    }
+}
+
 void
 lsp_print_detail (struct isis_lsp *lsp, struct vty *vty, char dynhost)
 {
@@ -836,12 +867,12 @@ lsp_print_detail (struct isis_lsp *lsp, struct vty *vty, char dynhost)
   int i;
   struct listnode *lnode;
   struct is_neigh *is_neigh;
-  struct te_is_neigh *te_is_neigh;
   struct ipv4_reachability *ipv4_reach;
   struct in_addr *ipv4_addr;
   struct te_ipv4_reachability *te_ipv4_reach;
   struct ipv6_reachability *ipv6_reach;
   struct mt_router_info *mt_router_info;
+  struct tlv_mt_neighbors *mt_is_neigh;
   struct in6_addr in6;
   u_char buff[BUFSIZ];
   u_char LSPid[255];
@@ -978,15 +1009,12 @@ lsp_print_detail (struct isis_lsp *lsp, struct vty *vty, char dynhost)
     }
 
   /* TE IS neighbor tlv */
-  if (lsp->tlv_data.te_is_neighs)
-    for (ALL_LIST_ELEMENTS_RO (lsp->tlv_data.te_is_neighs, lnode, te_is_neigh))
-    {
-      lspid_print (te_is_neigh->neigh_id, LSPid, dynhost, 0);
-      vty_out (vty, "  Metric      : %-8d IS-Extended   : %s%s",
-	       GET_TE_METRIC(te_is_neigh), LSPid, VTY_NEWLINE);
-      if (IS_MPLS_TE(isisMplsTE))
-        mpls_te_print_detail(vty, te_is_neigh);
-    }
+  lsp_print_mt_reach(lsp->tlv_data.te_is_neighs, vty,
+                     dynhost, ISIS_MT_IPV4_UNICAST);
+
+  /* MT IS neighbor tlv */
+  for (ALL_LIST_ELEMENTS_RO (lsp->tlv_data.mt_is_neighs, lnode, mt_is_neigh))
+    lsp_print_mt_reach(mt_is_neigh->list, vty, dynhost, mt_is_neigh->mtid);
 
   /* TE IPv4 tlv */
   if (lsp->tlv_data.te_ipv4_reachs)

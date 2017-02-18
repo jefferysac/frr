@@ -376,7 +376,7 @@ static void adj_mt_set(struct isis_adjacency *adj, unsigned int index,
   adj->mt_set[index] = mtid;
 }
 
-void
+bool
 tlvs_to_adj_mt_set(struct tlvs *tlvs, bool v4_usable, bool v6_usable,
                    struct isis_adjacency *adj)
 {
@@ -384,6 +384,16 @@ tlvs_to_adj_mt_set(struct tlvs *tlvs, bool v4_usable, bool v6_usable,
   unsigned int circuit_mt_count;
 
   unsigned int intersect_count = 0;
+
+  uint16_t *old_mt_set;
+  unsigned int old_mt_count;
+
+  old_mt_count = adj->mt_count;
+  if (old_mt_count)
+    {
+      old_mt_set = XCALLOC(MTYPE_TMP, old_mt_count * sizeof(*old_mt_set));
+      memcpy(old_mt_set, adj->mt_set, old_mt_count * sizeof(*old_mt_set));
+    }
 
   mt_settings = circuit_mt_settings(adj->circuit, &circuit_mt_count);
   for (unsigned int i = 0; i < circuit_mt_count; i++)
@@ -406,6 +416,21 @@ tlvs_to_adj_mt_set(struct tlvs *tlvs, bool v4_usable, bool v6_usable,
         }
     }
   adj->mt_count = intersect_count;
+
+  bool changed = false;
+
+  if (adj->mt_count != old_mt_count)
+    changed = true;
+
+  if (!changed && old_mt_count
+      && memcmp(adj->mt_set, old_mt_set,
+                old_mt_count * sizeof(*old_mt_set)))
+    changed = true;
+
+  if (old_mt_count)
+    XFREE(MTYPE_TMP, old_mt_set);
+
+  return changed;
 }
 
 void

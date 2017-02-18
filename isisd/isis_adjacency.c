@@ -524,3 +524,20 @@ isis_adj_build_up_list (struct list *adjdb, struct list *list)
 
   return;
 }
+
+int
+isis_adj_usage2levels(enum isis_adj_usage usage)
+{
+  switch (usage)
+    {
+    case ISIS_ADJ_LEVEL1:
+      return IS_LEVEL_1;
+    case ISIS_ADJ_LEVEL2:
+      return IS_LEVEL_2;
+    case ISIS_ADJ_LEVEL1AND2:
+      return IS_LEVEL_1 | IS_LEVEL_2;
+    default:
+      break;
+    }
+  return 0;
+}

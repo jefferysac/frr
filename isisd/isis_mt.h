@@ -113,7 +113,7 @@ struct isis_circuit_mt_setting* circuit_get_mt_setting(
 int circuit_write_mt_settings(struct isis_circuit *circuit, struct vty *vty);
 struct isis_circuit_mt_setting** circuit_mt_settings(struct isis_circuit *circuit,
                                                      unsigned int *mt_count);
-void tlvs_to_adj_mt_set(struct tlvs *tlvs, bool v4_usable, bool v6_usable,
+bool tlvs_to_adj_mt_set(struct tlvs *tlvs, bool v4_usable, bool v6_usable,
                         struct isis_adjacency *adj);
 void adj_mt_finish(struct isis_adjacency *adj);
 void tlvs_add_mt_bcast(struct tlvs *tlvs, struct isis_circuit *circuit,

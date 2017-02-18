@@ -635,7 +635,7 @@ process_p2p_hello (struct isis_circuit *circuit)
   if (found & TLVFLAG_IPV6_ADDR)
     tlvs_to_adj_ipv6_addrs (&tlvs, adj);
 
-  tlvs_to_adj_mt_set(&tlvs, v4_usable, v6_usable, adj);
+  bool mt_set_changed = tlvs_to_adj_mt_set(&tlvs, v4_usable, v6_usable, adj);
 
   zlog_warn("The adjacency is valid for the following topologies:");
   for (unsigned int i = 0; i < adj->mt_count; i++)
@@ -877,6 +877,13 @@ process_p2p_hello (struct isis_circuit *circuit)
       /* down - area mismatch */
       isis_adj_state_change (adj, ISIS_ADJ_DOWN, "Area Mismatch");
     }
+
+  if (adj->adj_state == ISIS_ADJ_UP && mt_set_changed)
+    {
+      lsp_regenerate_schedule(adj->circuit->area,
+                              isis_adj_usage2levels(adj->adj_usage), 0);
+    }
+
   /* 8.2.5.2 c) if the action was up - comparing circuit IDs */
   /* FIXME - Missing parts */
 
@@ -1232,7 +1239,7 @@ process_lan_hello (int level, struct isis_circuit *circuit, const u_char *ssnpa)
 
   adj->circuit_t = hdr.circuit_t;
 
-  tlvs_to_adj_mt_set(&tlvs, v4_usable, v6_usable, adj);
+  bool mt_set_changed = tlvs_to_adj_mt_set(&tlvs, v4_usable, v6_usable, adj);
 
   zlog_warn("The adjacency is valid for the following topologies:");
   for (unsigned int i = 0; i < adj->mt_count; i++)
@@ -1280,6 +1287,9 @@ process_lan_hello (int level, struct isis_circuit *circuit, const u_char *ssnpa)
     isis_adj_state_change (adj, ISIS_ADJ_INITIALIZING,
                            "no LAN Neighbours TLV found");
   }
+
+  if (adj->adj_state == ISIS_ADJ_UP && mt_set_changed)
+    lsp_regenerate_schedule(adj->circuit->area, level, 0);
 
 out:
   if (isis->debugs & DEBUG_ADJ_PACKETS)

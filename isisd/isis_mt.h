@@ -23,6 +23,8 @@
 #ifndef ISIS_MT_H
 #define ISIS_MT_H
 
+#define ISIS_MT_MASK           0x0fff
+
 #define ISIS_MT_IPV4_UNICAST   0
 #define ISIS_MT_IPV4_MGMT      1
 #define ISIS_MT_IPV6_UNICAST   2

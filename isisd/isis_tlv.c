@@ -96,6 +96,83 @@ free_tlvs (struct tlvs *tlvs)
   return;
 }
 
+static int
+parse_mt_is_neighs(struct tlvs *tlvs, bool read_mtid,
+                   unsigned int length, u_char *pnt)
+{
+  struct list *neigh_list;
+  uint16_t mtid;
+
+  if (read_mtid)
+    {
+      uint16_t mtid_buf;
+
+      if (length < sizeof(mtid_buf))
+        {
+          zlog_warn("ISIS-TLV: mt tlv too short to contain MT id");
+          return ISIS_WARNING;
+        }
+
+      memcpy(&mtid_buf, pnt, sizeof(mtid_buf));
+      pnt += sizeof(mtid_buf);
+      length -= sizeof(mtid_buf);
+
+      mtid = ntohs(mtid_buf) & ISIS_MT_MASK;
+    }
+  else
+    {
+      mtid = ISIS_MT_IPV4_UNICAST;
+    }
+
+  if (mtid == ISIS_MT_IPV4_UNICAST)
+    {
+      if (!tlvs->te_is_neighs)
+        {
+          tlvs->te_is_neighs = list_new();
+          tlvs->te_is_neighs->del = free_tlv;
+        }
+      neigh_list = tlvs->te_is_neighs;
+    }
+  else
+    {
+      struct tlv_mt_neighbors *neighbors;
+
+      neighbors = tlvs_get_mt_neighbors(tlvs, mtid);
+      neighbors->list->del = free_tlv;
+      neigh_list = neighbors->list;
+    }
+
+  while (length >= IS_NEIGHBOURS_LEN)
+    {
+      struct te_is_neigh *neigh = XCALLOC(MTYPE_ISIS_TLV, sizeof(*neigh));
+
+      memcpy(neigh, pnt, IS_NEIGHBOURS_LEN);
+      pnt += IS_NEIGHBOURS_LEN;
+      length -= IS_NEIGHBOURS_LEN;
+
+      if (neigh->sub_tlvs_length > length)
+        {
+          zlog_warn("ISIS-TLV: neighbor subtlv length exceeds TLV size");
+          XFREE(MTYPE_ISIS_TLV, neigh);
+          return ISIS_WARNING;
+        }
+
+      memcpy(neigh->sub_tlvs, pnt, neigh->sub_tlvs_length);
+      pnt += neigh->sub_tlvs_length;
+      length -= neigh->sub_tlvs_length;
+
+      listnode_add(neigh_list, neigh);
+    }
+
+  if (length)
+    {
+      zlog_warn("ISIS-TLV: TE/MT neighor TLV has trailing data");
+      return ISIS_WARNING;
+    }
+
+  return ISIS_OK;
+}
+
 /*
  * Parses the tlvs found in the variant length part of the PDU.
  * Caller tells with flags in "expected" which TLV's it is interested in.
@@ -108,7 +185,6 @@ parse_tlvs (char *areatag, u_char * stream, int size, u_int32_t * expected,
   struct lan_neigh *lan_nei;
   struct area_addr *area_addr;
   struct is_neigh *is_nei;
-  struct te_is_neigh *te_is_nei;
   struct es_neigh *es_nei;
   struct lsp_entry *lsp_entry;
   struct in_addr *ipv4_addr;
@@ -212,54 +288,25 @@ parse_tlvs (char *areatag, u_char * stream, int size, u_int32_t * expected,
 	  break;
 
 	case TE_IS_NEIGHBOURS:
-	  /* +-------+-------+-------+-------+-------+-------+-------+-------+
-	   * |                        Neighbour ID                           | 7
-	   * +---------------------------------------------------------------+
-	   * |                        TE Metric                              | 3
-	   * +---------------------------------------------------------------+
-	   * |                        SubTLVs Length                         | 1
-	   * +---------------------------------------------------------------+
-	   * :                                                               :
-	   */
 	  *found |= TLVFLAG_TE_IS_NEIGHS;
 #ifdef EXTREME_TLV_DEBUG
 	  zlog_debug ("ISIS-TLV (%s): Extended IS Neighbours length %d",
 		     areatag, length);
 #endif /* EXTREME_TLV_DEBUG */
 	  if (TLVFLAG_TE_IS_NEIGHS & *expected)
-	    {
-	      while (length > value_len)
-		{
-		  te_is_nei = (struct te_is_neigh *) pnt;
-		  value_len += IS_NEIGHBOURS_LEN;
-		  pnt += IS_NEIGHBOURS_LEN;
-                  /* FIXME - subtlvs are handled here, for now we skip */
-		  /* FIXME: All TE SubTLVs are not necessary present in LSP PDU. */
-		  /* So, it must be copied in a new te_is_neigh structure        */
-		  /* rather than just initialize pointer to the original LSP PDU */
-		  /* to avoid consider the rest of lspdu as subTLVs or buffer overflow */
-		  if (IS_MPLS_TE(isisMplsTE))
-		    {
-		      struct te_is_neigh *new = XCALLOC(MTYPE_ISIS_TLV, sizeof(struct te_is_neigh));
-		      memcpy(new->neigh_id, te_is_nei->neigh_id, ISIS_SYS_ID_LEN + 1);
-		      memcpy(new->te_metric, te_is_nei->te_metric, 3);
-		      new->sub_tlvs_length = te_is_nei->sub_tlvs_length;
-		      memcpy(new->sub_tlvs, pnt, te_is_nei->sub_tlvs_length);
-                      te_is_nei = new;
-                    }
-		  /* Skip SUB TLVs payload */
-		  value_len += te_is_nei->sub_tlvs_length;
-		  pnt += te_is_nei->sub_tlvs_length;
+	    retval = parse_mt_is_neighs(tlvs, false, length, pnt);
+	  pnt += length;
+	  break;
 
-		  if (!tlvs->te_is_neighs)
-		    tlvs->te_is_neighs = list_new ();
-		  listnode_add (tlvs->te_is_neighs, te_is_nei);
-		}
-	    }
-	  else
-	    {
-	      pnt += length;
-	    }
+	case MT_IS_NEIGHBOURS:
+	  *found |= TLVFLAG_MT_IS_NEIGHS;
+#ifdef EXTREME_TLV_DEBUG
+	  zlog_debug ("ISIS-TLV (%s): MT IS Neighbours length %d",
+	              areatag, length);
+#endif
+	  if (TLVFLAG_MT_IS_NEIGHS & *expected)
+	    retval = parse_mt_is_neighs(tlvs, true, length, pnt);
+	  pnt += length;
 	  break;
 
 	case ES_NEIGHBOURS:

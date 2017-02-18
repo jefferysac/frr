@@ -501,6 +501,7 @@ lsp_update_data (struct isis_lsp *lsp, struct stream *stream,
       expected |= TLVFLAG_TE_IS_NEIGHS;
       expected |= TLVFLAG_TE_IPV4_REACHABILITY;
       expected |= TLVFLAG_TE_ROUTER_ID;
+      expected |= TLVFLAG_MT_IS_NEIGHS;
     }
   expected |= TLVFLAG_MT_ROUTER_INFORMATION;
   expected |= TLVFLAG_IPV4_ADDR;

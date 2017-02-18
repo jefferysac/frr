@@ -311,6 +311,7 @@ struct tlvs
 #define TLVFLAG_CHECKSUM                  (1<<20)
 #define TLVFLAG_GRACEFUL_RESTART          (1<<21)
 #define TLVFLAG_MT_ROUTER_INFORMATION     (1<<22)
+#define TLVFLAG_MT_IS_NEIGHS              (1<<23)
 
 void init_tlvs (struct tlvs *tlvs, uint32_t expected);
 void free_tlvs (struct tlvs *tlvs);

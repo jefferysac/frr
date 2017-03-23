@@ -160,3 +160,10 @@ html-local: $(HTMLS)
 	else \
 		echo "$(HTMLS) is not a directory. Make it so, the rerun make."; \
 	fi
+
+ALLSPHINXOPTS   = -d sphinx/doctrees source
+SPHINXBUILD     = sphinx-build
+
+sphinx-html:
+	$(SPHINXBUILD) -b html $(ALLSPHINXOPTS) sphinx/html
+	

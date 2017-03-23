@@ -1,0 +1,17 @@
+.rst-content table.field-list th,
+.rst-content table.field-list td {
+	font-size: 16px;
+	padding-top: 8px;
+}
+
+.rst-content .admonition-todo {
+	line-height: 18px;
+	margin-bottom: 24px;
+	padding: 6px 12px;
+	background: #f3e7fa none repeat scroll 0 0;
+}
+
+.rst-content .admonition-todo .admonition-title {
+	background: #c67ef0 none repeat scroll 0 0;
+}
+

@@ -1415,6 +1415,8 @@ vty_clear_prefix_list (struct vty *vty, afi_t afi, const char *name,
 
 #include "plist_clippy.c"
 
+/*~ documentation comment
+ */
 VTYSH_TARGETS(VTYSH_RIPD|VTYSH_OSPFD|VTYSH_BGPD|VTYSH_ZEBRA|VTYSH_PIMD)
 
 DEFPY (ip_prefix_list,

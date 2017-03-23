@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import re, glob, subprocess, os, os.path, sys, resource, time, argparse, json
+from string import Template
 from io import StringIO
 from functools import reduce
 import clippy
@@ -197,6 +198,9 @@ class DefunGroup(object):
         self.defuns.append(defun)
         return self
 
+    def __repr__(self):
+        return '<%s: "%s", %d elements>' % (self.__class__.__name__, self.name, len (self.defuns))
+
     @classmethod
     def iter(cls):
         for name, grp in sorted(cls.index.items(), key = lambda x: x[1].defuns[0].cmdname):
@@ -353,15 +357,25 @@ class DefunCmdGroup(DefunGroup):
         for defun in self.defuns:
             if defun.filename == filename:
                 defun.add_install(node, cond, filename, lineno)
+                NodeGroup(node).append(defun)
                 return
         sys.stderr.write('%-25s %5d: non-local install: %s -> %s\n' % (
                 filename + ':', lineno, self.cmdname, node))
         self.unbound_installs.append((node, cond, filename, lineno))
 
+class NodeGroup(DefunGroup):
+    index = {}
+    def _init(self, nodename):
+        self.nodename = nodename
+        self.targets = set()
+    def append(self, defun):
+        self.targets = self.targets.union(set([tuple(defun.targets)]))
+        return super(NodeGroup, self).append(defun)
+
 class Defun(object):
     dupstrs = []
 
-    def __init__(self, filename, lineno, targets, deftype, hidden, args, condstack, ignore, nodeswitch):
+    def __init__(self, filename, lineno, targets, deftype, hidden, args, condstack, ignore, nodeswitch, comments):
         self.filename = filename
         self.lineno = lineno
         self.targets = reduce(lambda x,y: x+y, [[tt.strip() for tt in t.split('|')] for t in targets], [])
@@ -371,6 +385,7 @@ class Defun(object):
         self.ignore = ignore
         self.nodeswitch = nodeswitch
         self.installs = {}
+        self.comments = comments
 
         self.cmdname = str(args[1])
         try:
@@ -395,7 +410,129 @@ class Defun(object):
                 self.filename, self.lineno,
                 self.deftype,
                 ' (hidden)' if self.hidden else '',
-                self.args[2].replace('\n', ''))
+                str(self.args[2]).replace('\n', ''))
+
+    tokens = {
+        'WORD_TKN':        'token word',
+        'VARIABLE_TKN':    'token var',
+        'RANGE_TKN':       'token range',
+        'IPV4_TKN':        'token ipv4',
+        'IPV6_TKN':        'token ipv6',
+        'IPV4_PREFIX_TKN': 'token pfx4',
+        'IPV4_PREFIX_TKN': 'token pfx6',
+    }
+    stripname_re = re.compile(r'\$[^\s]+ ')
+
+    def doccomm(self):
+        agg = ''
+        for dc in self.comments:
+            if dc.startswith('//~ '):
+                agg += dc[4:]
+                continue
+            if dc.startswith('//~'):
+                agg += dc[3:]
+                continue
+            assert dc.startswith('/*~')
+            if dc.startswith('/*~ '):
+                dc = dc[4:-2]
+            else:
+                dc = dc[3:-2]
+            dc = dc.split('\n')
+            while len(dc) > 0:
+                if dc[0].strip(' \t\n*') == '':
+                    dc.pop(0)
+                else:
+                    break
+            while len(dc) > 0:
+                if dc[len(dc) - 1].strip(' \t\n*') == '':
+                    dc.pop(len(dc) - 1)
+                else:
+                    break
+            for line in dc:
+                if   line.startswith(' * '): line = line[3:]
+                elif line.startswith('   '): line = line[3:]
+                elif line.startswith(' *'):  line = line[2:]
+                elif line.startswith('  '):  line = line[2:]
+                agg += '   %s\n' % (line)
+        return agg
+
+    def doc(self):
+        cmdhelp = self.cmdhelp.replace('\\n', '\n')
+        graph = clippy.Graph(self.cmddef, cmdhelp)
+
+        from lib import magic
+        cmdargs = []
+
+        nestlevel = 0
+
+        for token, depth in magic.graph_iterate(graph):
+            if token.type == 'FORK_TKN':
+                pending = []
+                nestlevel += 1
+                continue
+            if token.type == 'JOIN_TKN':
+                pending = []
+                nestlevel -= 1
+                continue
+            if token.type not in self.tokens: continue
+
+            text = token.text
+            if len(cmdargs) > 0:
+                lastarg, lastdepth, lasttext = cmdargs[-1]
+                if lastarg.type == 'WORD_TKN' and token.type != 'WORD_TKN' and (lastdepth + 1 == depth):
+                    cmdargs.pop(-1)
+                    text = '%s %s' % (lastarg.text, token.text)
+
+            outtext = '   :%s %s: %s$$%s\n' % (self.tokens[token.type], token.varname, text, token.desc)
+            cmdargs.append((token, depth, outtext))
+
+        cmdargs = ''.join([arg[2] for arg in cmdargs])
+        cmddef = self.stripname_re.sub(' ', self.cmddef)
+        doccomm = self.doccomm()
+        if doccomm.strip() == '':
+            doccomm = ''
+        else:
+            doccomm = '\n' + doccomm
+
+        targets = ', '.join([k.replace('VTYSH_', '').lower() for k in sorted(self.targets)])
+
+        args = list(self.__dict__.items()) + list(locals().items())
+        tplargs = dict([(k, str(v)) for k, v in args if not k.startswith('_')])
+        return self.doctpl.substitute(tplargs)
+    doctpl = Template('''.. function:: $cmddef
+
+   (available in: $targets)
+$doccomm
+$cmdargs
+
+''')
+
+
+def doc_generate(dirname):
+    def defun_key(defun):
+        k = defun.cmddef
+        if k.startswith('[no] '):
+            k = k[5:]
+        if k.startswith('no '):
+            k = k[3:] + 'ZZZZ'
+        k = k.translate({'[': None, ']': None, '{': None, '}': None, '[': None, ']': None, '|': ' '})
+        return k
+
+    for name, group in sorted(NodeGroup.index.items()):
+        print('%r %r' % (name, group))
+        print('\t%s' % ('\n\t'.join(sorted([repr(sorted(i)) for i in group.targets]))))
+
+        filename = '%s/node_%s.rst' % (dirname, name.lower().replace('_node', ''))
+        #print(filename)
+        with open(filename, 'w') as docfd:
+            docfd.write('.. autogenerated reference by clippy\n\n.. default-domain:: frrcli\n\n%s\n%s\n\n' % (name, '=' * len(name)))
+
+            for defun in sorted(group.defuns, key = defun_key):
+                docfd.write(defun.doc())
+                if False:
+                    import code
+                    code.interact(local=locals())
+                    sys.exit(0)
 
 headers = {}
 
@@ -450,6 +587,7 @@ def process_flex(fn, defuns = True):
     defs = CppDefs(fn)
     numdefuns = 0
     nodeswitch = None
+    comments = []
 
     # print >>sys.stderr, '%9.6f %s' % (time.time() - t0, fn)
     data = getflex(fn)
@@ -505,6 +643,10 @@ def process_flex(fn, defuns = True):
             sys.stderr.write('%s:%d: CPP unsupported: %s\n' % (fn, tok['lineno'], tok['line']))
             continue
 
+        if tok['type'] == 'COMMENT':
+            comments.append(tok['line'])
+            continue
+
         if not defuns: continue
 
         args = [FlexArg(a, defs) for a in tok['args']]
@@ -521,10 +663,11 @@ def process_flex(fn, defuns = True):
             defhidden = tok['type'].endswith('_HIDDEN')
             defnosh = tok['type'].endswith('_NOSH')
 
-            defun = Defun(fn, lineno, targets, deftype, defhidden, args, condstack, defnosh, nodeswitch)
+            defun = Defun(fn, lineno, targets, deftype, defhidden, args, condstack, defnosh, nodeswitch, comments)
             if not defnosh:
                 numdefuns += 1
             nodeswitch = None
+            comments = []
             continue
 
         if tok['type'] == 'VTYSH_TARGETS':
@@ -647,6 +790,7 @@ argp.add_argument('-Wdisabled', action = 'store_const', const = True)
 argp.add_argument('-Wignored', action = 'store_const', const = True)
 argp.add_argument('-Wextra', action = 'store_const', const = True)
 argp.add_argument('--dump-conds', action = 'store_const', const = True)
+argp.add_argument('--doc', type = str)
 args = argp.parse_args()
 
 for fn in globbed:
@@ -686,3 +830,6 @@ vtysh_init_cmd ()
         for node, cmd in sorted(initinstalls):
             fd.write('  install_element (%s, &%s_vtysh);\n' % (node, cmd))
         fd.write('}\n')
+
+if args.doc is not None:
+    doc_generate(args.doc)

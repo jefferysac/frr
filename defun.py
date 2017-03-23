@@ -307,6 +307,13 @@ class DefunDefGroup(DefunGroup):
                         first.filename + ':', first.lineno, first.cmdname, first.cmddef))
             return
 
+        nodeswitch = set([defun.nodeswitch for defun in active])
+        if len(nodeswitch) != 1:
+            sys.stderr.write('%-25s %5d: inconsistent nodeswitch: %s ("%s") - %r\n' % (
+                    first.filename + ':', first.lineno, first.cmdname, first.cmddef, list(nodeswitch)))
+            return
+        nodeswitch = list(nodeswitch)[0]
+
         targets = set()
         for defun in active:
             for target in defun.targets:
@@ -318,12 +325,17 @@ class DefunDefGroup(DefunGroup):
                     first.filename + ':', first.lineno, first.cmdname, first.cmddef))
             return None
 
-        defsh = 'DEFSH%s (%s, %s_vtysh,\n\t%s,\n\t%s)\n' % (
+        defsh = '%s%s (%s,%s\n\t%s_vtysh,\n\t%s,\n\t%s)\n' % (
+                'DEFUNSH' if nodeswitch else 'DEFSH',
                 '_HIDDEN' if first.hidden else '',
                 '|'.join(targets),
+                ('\n\t%s,' % first.args[0]) if nodeswitch else '',
                 first.cmdname,
                 '"%s"' % first.args[2].collapse(),
                 '"%s"' % first.args[3].collapse().replace('\\n', '\\n"\n\t"'))
+        defsh = defsh.replace('\n\t"")', ')')
+        if nodeswitch:
+            defsh += '{\n  vty->node = %s;\n  return CMD_SUCCESS;\n}\n' % (nodeswitch)
 
         for n in nodes:
             initinstalls.append((n, first.cmdname))
@@ -349,7 +361,7 @@ class DefunCmdGroup(DefunGroup):
 class Defun(object):
     dupstrs = []
 
-    def __init__(self, filename, lineno, targets, deftype, hidden, args, condstack, ignore):
+    def __init__(self, filename, lineno, targets, deftype, hidden, args, condstack, ignore, nodeswitch):
         self.filename = filename
         self.lineno = lineno
         self.targets = reduce(lambda x,y: x+y, [[tt.strip() for tt in t.split('|')] for t in targets], [])
@@ -357,6 +369,7 @@ class Defun(object):
         self.hidden = hidden
         self.args = args
         self.ignore = ignore
+        self.nodeswitch = nodeswitch
         self.installs = {}
 
         self.cmdname = str(args[1])
@@ -436,6 +449,7 @@ def process_flex(fn, defuns = True):
 
     defs = CppDefs(fn)
     numdefuns = 0
+    nodeswitch = None
 
     # print >>sys.stderr, '%9.6f %s' % (time.time() - t0, fn)
     data = getflex(fn)
@@ -494,10 +508,6 @@ def process_flex(fn, defuns = True):
         if not defuns: continue
 
         args = [FlexArg(a, defs) for a in tok['args']]
-        if tok['type'] == 'VTYSH_TARGETS':
-            targets = [str(args[0])]
-            continue
-
         if tok['type'] == 'install_element':
             lineno = tok['lineno']
             node = str(args[0])
@@ -511,10 +521,20 @@ def process_flex(fn, defuns = True):
             defhidden = tok['type'].endswith('_HIDDEN')
             defnosh = tok['type'].endswith('_NOSH')
 
-            defun = Defun(fn, lineno, targets, deftype, defhidden, args, condstack, defnosh)
+            defun = Defun(fn, lineno, targets, deftype, defhidden, args, condstack, defnosh, nodeswitch)
             if not defnosh:
                 numdefuns += 1
+            nodeswitch = None
             continue
+
+        if tok['type'] == 'VTYSH_TARGETS':
+            targets = [str(args[0])]
+            continue
+
+        if tok['type'] == 'VTYSH_NODESWITCH':
+            nodeswitch = str(args[0])
+            continue
+
         sys.stderr.write('???? %r\n' % (tok['type']))
 
     #print >>sys.stderr, 'loaded %s in %f sec' % (fn, cputime() - begin)

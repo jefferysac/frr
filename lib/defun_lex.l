@@ -16,7 +16,7 @@
 
 #define DEFUNNY		270
 #define INSTALL		271
-#define TARGETS		272
+#define AUXILIARY	272
 
 int comment_link;
 char string_end;
@@ -96,7 +96,8 @@ SPECIAL		[(),]
 "ALIAS"				value = strdup(yytext); return DEFUNNY;
 "ALIAS_HIDDEN"			value = strdup(yytext); return DEFUNNY;
 "install_element"		value = strdup(yytext); return INSTALL;
-"VTYSH_TARGETS"			value = strdup(yytext); return TARGETS;
+"VTYSH_TARGETS"			value = strdup(yytext); return AUXILIARY;
+"VTYSH_NODESWITCH"		value = strdup(yytext); return AUXILIARY;
 
 [ \t\n]+			/* ignore */
 \\				/* ignore */
@@ -183,7 +184,7 @@ PyObject *clippy_parse(PyObject *self, PyObject *args)
 		switch (token) {
 		case DEFUNNY:
 		case INSTALL:
-		case TARGETS:
+		case AUXILIARY:
 			pyArgs = get_args();
 			pyItem = PyDict_New();
 			PyDict_SetItemString(pyItem, "type", PyUnicode_FromString(tval));

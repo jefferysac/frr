@@ -808,7 +808,8 @@ DEFUN (no_auto_summary,
 }
 
 /* "router bgp" commands. */
-DEFUN_NOSH (router_bgp,
+VTYSH_NODESWITCH (BGP_NODE)
+DEFUN (router_bgp,
        router_bgp_cmd,
        "router bgp [(1-4294967295) [<view|vrf> WORD]]",
        ROUTER_STR
@@ -5694,7 +5695,8 @@ DEFUN_NOSH (address_family_ipv6_safi,
 }
 
 #ifdef KEEP_OLD_VPN_COMMANDS
-DEFUN_NOSH (address_family_vpnv4,
+VTYSH_NODESWITCH (BGP_VPNV4_NODE)
+DEFUN (address_family_vpnv4,
        address_family_vpnv4_cmd,
        "address-family vpnv4 [unicast]",
        "Enter Address Family command mode\n"
@@ -5705,7 +5707,8 @@ DEFUN_NOSH (address_family_vpnv4,
   return CMD_SUCCESS;
 }
 
-DEFUN_NOSH (address_family_vpnv6,
+VTYSH_NODESWITCH (BGP_VPNV6_NODE)
+DEFUN (address_family_vpnv6,
        address_family_vpnv6_cmd,
        "address-family vpnv6 [unicast]",
        "Enter Address Family command mode\n"
@@ -5717,7 +5720,8 @@ DEFUN_NOSH (address_family_vpnv6,
 }
 #endif
 
-DEFUN_NOSH (address_family_encap,
+VTYSH_NODESWITCH (BGP_ENCAP_NODE)
+DEFUN (address_family_encap,
        address_family_encap_cmd,
        "address-family <encap|encapv4>",
        "Enter Address Family command mode\n"
@@ -5729,7 +5733,8 @@ DEFUN_NOSH (address_family_encap,
 }
 
 
-DEFUN_NOSH (address_family_encapv6,
+VTYSH_NODESWITCH (BGP_ENCAPV6_NODE)
+DEFUN (address_family_encapv6,
        address_family_encapv6_cmd,
        "address-family encapv6",
        "Enter Address Family command mode\n"
@@ -5739,7 +5744,8 @@ DEFUN_NOSH (address_family_encapv6,
   return CMD_SUCCESS;
 }
 
-DEFUN_NOSH (address_family_evpn,
+VTYSH_NODESWITCH (BGP_EVPN_NODE)
+DEFUN (address_family_evpn,
        address_family_evpn_cmd,
        "address-family <l2vpn evpn>",
        "Enter Address Family command mode\n"
@@ -5751,7 +5757,8 @@ DEFUN_NOSH (address_family_evpn,
   return CMD_SUCCESS;
 }
 
-DEFUN_NOSH (exit_address_family,
+VTYSH_NODESWITCH (BGP_NODE)
+DEFUN (exit_address_family,
        exit_address_family_cmd,
        "exit-address-family",
        "Exit from Address Family configuration mode\n")

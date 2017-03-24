@@ -101,4 +101,5 @@ vtysh_cmd_DEPS += $(top_builddir)/ldpd/ldp_vty_cmds.c
 endif
 
 vtysh_cmd.c: $(vtysh_cmd_DEPS) ../defun.py
-	cd ..; lib/clippy defun.py --vtysh-cmds vtysh/$@
+	$(AM_V_at)$(MAKE) -C $(top_builddir)/lib clippy
+	$(AM_V_CLIPPY)cd ..; lib/clippy defun.py --vtysh-cmds vtysh/$@

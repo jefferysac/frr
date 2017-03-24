@@ -10,7 +10,7 @@ am__v_CLIPPY_1 =
 
 SUFFIXES = _clippy.c
 .c_clippy.c:
-	$(AM_V_at)make -C $(top_builddir)/lib clippy
+	$(AM_V_at)$(MAKE) -C $(top_builddir)/lib clippy
 	$(AM_V_CLIPPY)$(top_builddir)/lib/clippy $(top_srcdir)/lib/magic.py $< > $@.tmp
 	@{ test -f $@ && diff $@.tmp $@ >/dev/null 2>/dev/null; } && rm $@.tmp || mv $@.tmp $@
 

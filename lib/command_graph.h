@@ -73,7 +73,7 @@ enum
 struct cmd_token
 {
   enum cmd_token_type type;     // token type
-  u_char attr;                  // token attributes
+  uint8_t attr;                 // token attributes
   bool allowrepeat;             // matcher allowed to match token repetively?
   uint32_t refcnt;
 
@@ -92,7 +92,7 @@ struct cmd_element
   const char *string;           /* Command specification by string. */
   const char *doc;              /* Documentation of this command. */
   int daemon;                   /* Daemon to which this command belong. */
-  u_char attr;                  /* Command attributes */
+  uint8_t attr;                 /* Command attributes */
 
   /* handler function for command */
   int (*func) (const struct cmd_element *, struct vty *, int, struct cmd_token *[]);
@@ -104,7 +104,7 @@ struct cmd_element
 #define CMD_CR_TEXT "<cr>"
 
 /* memory management for cmd_token */
-extern struct cmd_token *cmd_token_new (enum cmd_token_type, u_char attr,
+extern struct cmd_token *cmd_token_new (enum cmd_token_type, uint8_t attr,
                                         const char *text, const char *desc);
 extern struct cmd_token *cmd_token_dup (struct cmd_token *);
 extern void cmd_token_del (struct cmd_token *);

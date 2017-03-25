@@ -102,4 +102,4 @@ endif
 
 vtysh_cmd.c: $(vtysh_cmd_DEPS) ../defun.py
 	$(AM_V_at)$(MAKE) -C $(top_builddir)/lib clippy
-	$(AM_V_CLIPPY)cd ..; lib/clippy defun.py --vtysh-cmds vtysh/$@
+	$(AM_V_CLIPPY)cd ..; lib/clippy defun.py --cpp "$(CPP)" --vtysh-cmds vtysh/$@

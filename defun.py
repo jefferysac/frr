@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-import re, glob, subprocess, os, os.path, sys, resource, time, argparse, json
+import re, glob, subprocess, os, os.path, sys, resource, time, argparse, json, shlex
 from string import Template
 from io import StringIO
 from functools import reduce
@@ -119,10 +119,11 @@ class Condition(object):
         self.defuns.append(defun)
         return self
 
+    cpp = ['cpp']
     @classmethod
     def checkall(cls):
         conds = cls.conds
-        cpp = subprocess.Popen(['cpp', '-include', 'config.h', '-'],
+        cpp_p = subprocess.Popen(cls.cpp + ['-include', 'config.h', '-'],
                 stdin = subprocess.PIPE,
                 stdout = subprocess.PIPE)
         test = ''
@@ -141,7 +142,7 @@ class Condition(object):
                         inner, thistest, num)
             test = test + thistest
 
-        rv = cpp.communicate(test.encode('UTF-8'))[0].decode('UTF-8').split('\n')
+        rv = cpp_p.communicate(test.encode('UTF-8'))[0].decode('UTF-8').split('\n')
         for line in rv:
             line = line.strip()
             if line == '' or line.startswith('#'):
@@ -791,7 +792,10 @@ argp.add_argument('-Wignored', action = 'store_const', const = True)
 argp.add_argument('-Wextra', action = 'store_const', const = True)
 argp.add_argument('--dump-conds', action = 'store_const', const = True)
 argp.add_argument('--doc', type = str)
+argp.add_argument('--cpp', type = str, default = 'cpp')
 args = argp.parse_args()
+
+Condition.cpp = shlex.split(args.cpp)
 
 for fn in globbed:
     defs, numdefuns = process_flex(fn)

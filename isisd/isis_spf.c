@@ -1427,14 +1427,23 @@ isis_print_paths (struct vty *vty, struct list *paths, u_char *root_sysid)
 
 DEFUN (show_isis_topology,
        show_isis_topology_cmd,
-       "show isis topology",
+       "show isis topology [<level-1|level-2>]",
        SHOW_STR
        "IS-IS information\n"
-       "IS-IS paths to Intermediate Systems\n")
+       "IS-IS paths to Intermediate Systems\n"
+       "Paths to all level-1 routers in the area\n"
+       "Paths to all level-2 routers in the domain\n")
 {
+  int levels;
   struct listnode *node;
   struct isis_area *area;
-  int level;
+
+  if (argc < 4)
+    levels = ISIS_LEVEL1|ISIS_LEVEL2;
+  else if (!strcmp(argv[3]->arg, "level-1"))
+    levels = ISIS_LEVEL1;
+  else
+    levels = ISIS_LEVEL2;
 
   if (!isis->area_list || isis->area_list->count == 0)
     return CMD_SUCCESS;
@@ -1444,109 +1453,30 @@ DEFUN (show_isis_topology,
       vty_out (vty, "Area %s:%s", area->area_tag ? area->area_tag : "null",
 	       VTY_NEWLINE);
 
-      for (level = 0; level < ISIS_LEVELS; level++)
+      for (int level = ISIS_LEVEL1; level <= ISIS_LEVELS; level++)
 	{
-	  if (area->ip_circuits > 0 && area->spftree[level]
-	      && area->spftree[level]->paths->count > 0)
+	  if ((level & levels) == 0)
+	    continue;
+
+	  if (area->ip_circuits > 0 && area->spftree[level-1]
+	      && area->spftree[level-1]->paths->count > 0)
 	    {
 	      vty_out (vty, "IS-IS paths to level-%d routers that speak IP%s",
-		       level + 1, VTY_NEWLINE);
-	      isis_print_paths (vty, area->spftree[level]->paths, isis->sysid);
+		       level, VTY_NEWLINE);
+	      isis_print_paths (vty, area->spftree[level-1]->paths, isis->sysid);
 	      vty_out (vty, "%s", VTY_NEWLINE);
 	    }
-	  if (area->ipv6_circuits > 0 && area->spftree6[level]
-	      && area->spftree6[level]->paths->count > 0)
+	  if (area->ipv6_circuits > 0 && area->spftree6[level-1]
+	      && area->spftree6[level-1]->paths->count > 0)
 	    {
 	      vty_out (vty,
 		       "IS-IS paths to level-%d routers that speak IPv6%s",
-		       level + 1, VTY_NEWLINE);
-	      isis_print_paths (vty, area->spftree6[level]->paths, isis->sysid);
+		       level, VTY_NEWLINE);
+	      isis_print_paths (vty, area->spftree6[level-1]->paths, isis->sysid);
 	      vty_out (vty, "%s", VTY_NEWLINE);
 	    }
 	}
 
-      vty_out (vty, "%s", VTY_NEWLINE);
-    }
-
-  return CMD_SUCCESS;
-}
-
-DEFUN (show_isis_topology_l1,
-       show_isis_topology_l1_cmd,
-       "show isis topology level-1",
-       SHOW_STR
-       "IS-IS information\n"
-       "IS-IS paths to Intermediate Systems\n"
-       "Paths to all level-1 routers in the area\n")
-{
-  struct listnode *node;
-  struct isis_area *area;
-
-  if (!isis->area_list || isis->area_list->count == 0)
-    return CMD_SUCCESS;
-
-  for (ALL_LIST_ELEMENTS_RO (isis->area_list, node, area))
-    {
-      vty_out (vty, "Area %s:%s", area->area_tag ? area->area_tag : "null",
-	       VTY_NEWLINE);
-
-      if (area->ip_circuits > 0 && area->spftree[0]
-	  && area->spftree[0]->paths->count > 0)
-	{
-	  vty_out (vty, "IS-IS paths to level-1 routers that speak IP%s",
-		   VTY_NEWLINE);
-	  isis_print_paths (vty, area->spftree[0]->paths, isis->sysid);
-	  vty_out (vty, "%s", VTY_NEWLINE);
-	}
-      if (area->ipv6_circuits > 0 && area->spftree6[0]
-	  && area->spftree6[0]->paths->count > 0)
-	{
-	  vty_out (vty, "IS-IS paths to level-1 routers that speak IPv6%s",
-		   VTY_NEWLINE);
-	  isis_print_paths (vty, area->spftree6[0]->paths, isis->sysid);
-	  vty_out (vty, "%s", VTY_NEWLINE);
-	}
-      vty_out (vty, "%s", VTY_NEWLINE);
-    }
-
-  return CMD_SUCCESS;
-}
-
-DEFUN (show_isis_topology_l2,
-       show_isis_topology_l2_cmd,
-       "show isis topology level-2",
-       SHOW_STR
-       "IS-IS information\n"
-       "IS-IS paths to Intermediate Systems\n"
-       "Paths to all level-2 routers in the domain\n")
-{
-  struct listnode *node;
-  struct isis_area *area;
-
-  if (!isis->area_list || isis->area_list->count == 0)
-    return CMD_SUCCESS;
-
-  for (ALL_LIST_ELEMENTS_RO (isis->area_list, node, area))
-    {
-      vty_out (vty, "Area %s:%s", area->area_tag ? area->area_tag : "null",
-	       VTY_NEWLINE);
-
-      if (area->ip_circuits > 0 && area->spftree[1]
-	  && area->spftree[1]->paths->count > 0)
-	{
-	  vty_out (vty, "IS-IS paths to level-2 routers that speak IP%s",
-		   VTY_NEWLINE);
-	  isis_print_paths (vty, area->spftree[1]->paths, isis->sysid);
-	  vty_out (vty, "%s", VTY_NEWLINE);
-	}
-      if (area->ipv6_circuits > 0 && area->spftree6[1]
-	  && area->spftree6[1]->paths->count > 0)
-	{
-	  vty_out (vty, "IS-IS paths to level-2 routers that speak IPv6%s",
-		   VTY_NEWLINE);
-	  isis_print_paths (vty, area->spftree6[1]->paths, isis->sysid);
-	  vty_out (vty, "%s", VTY_NEWLINE);
-	}
       vty_out (vty, "%s", VTY_NEWLINE);
     }
 
@@ -1557,6 +1487,4 @@ void
 isis_spf_cmds_init ()
 {
   install_element (VIEW_NODE, &show_isis_topology_cmd);
-  install_element (VIEW_NODE, &show_isis_topology_l1_cmd);
-  install_element (VIEW_NODE, &show_isis_topology_l2_cmd);
 }

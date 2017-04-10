@@ -864,7 +864,8 @@ parse_tlvs (char *areatag, u_char * stream, int size, u_int32_t * expected,
 
 	          mt_info = ntohs(mt_info);
 	          info = XCALLOC(MTYPE_ISIS_TLV, sizeof(*info));
-	          info->mtid = mt_info & 0x0fff;
+	          info->mtid = mt_info & ISIS_MT_MASK;
+	          info->overload = mt_info & ISIS_MT_OL_MASK;
 	          listnode_add(tlvs->mt_router_info, info);
 	        }
 	    }

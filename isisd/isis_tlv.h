@@ -254,7 +254,8 @@ struct ipv6_reachability
 
 struct mt_router_info
 {
-  uint16_t mtid;
+  ISIS_MT_INFO_FIELDS
+  bool overload;
 };
 
 /*

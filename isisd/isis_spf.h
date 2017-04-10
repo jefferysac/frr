@@ -59,6 +59,9 @@ struct isis_spftree
   unsigned int runcount;        /* number of runs since uptime */
   time_t last_run_timestamp;    /* last run timestamp for scheduling */
   time_t last_run_duration;     /* last run duration in msec */
+
+  int family;
+  int level;
 };
 
 struct isis_spftree * isis_spftree_new (struct isis_area *area);

@@ -63,8 +63,6 @@ struct isis_spftree
 
 struct isis_spftree * isis_spftree_new (struct isis_area *area);
 void isis_spftree_del (struct isis_spftree *spftree);
-void isis_spftree_adj_del (struct isis_spftree *spftree,
-                           struct isis_adjacency *adj);
 void spftree_area_init (struct isis_area *area);
 void spftree_area_del (struct isis_area *area);
 void spftree_area_adj_del (struct isis_area *area,

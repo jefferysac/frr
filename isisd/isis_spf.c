@@ -248,7 +248,7 @@ isis_spftree_del (struct isis_spftree *spftree)
   return;
 }
 
-void
+static void
 isis_spftree_adj_del (struct isis_spftree *spftree, struct isis_adjacency *adj)
 {
   struct listnode *node;

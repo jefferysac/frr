@@ -637,10 +637,6 @@ process_p2p_hello (struct isis_circuit *circuit)
 
   bool mt_set_changed = tlvs_to_adj_mt_set(&tlvs, v4_usable, v6_usable, adj);
 
-  zlog_warn("The adjacency is valid for the following topologies:");
-  for (unsigned int i = 0; i < adj->mt_count; i++)
-    zlog_warn("  MT %s", isis_mtid2str(adj->mt_set[i]));
-
   /* lets take care of the expiry */
   THREAD_TIMER_OFF (adj->t_expire);
   THREAD_TIMER_ON (master, adj->t_expire, isis_adj_expire, adj,
@@ -1240,10 +1236,6 @@ process_lan_hello (int level, struct isis_circuit *circuit, const u_char *ssnpa)
   adj->circuit_t = hdr.circuit_t;
 
   bool mt_set_changed = tlvs_to_adj_mt_set(&tlvs, v4_usable, v6_usable, adj);
-
-  zlog_warn("The adjacency is valid for the following topologies:");
-  for (unsigned int i = 0; i < adj->mt_count; i++)
-    zlog_warn("  MT %s", isis_mtid2str(adj->mt_set[i]));
 
   /* lets take care of the expiry */
   THREAD_TIMER_OFF (adj->t_expire);

@@ -37,6 +37,16 @@ DEFINE_MTYPE_STATIC(ISISD, MT_NEIGHBORS, "ISIS MT Neighbors for TLV")
 DEFINE_MTYPE_STATIC(ISISD, MT_IPV4_REACHS, "ISIS MT IPv4 Reachabilities for TLV")
 DEFINE_MTYPE_STATIC(ISISD, MT_IPV6_REACHS, "ISIS MT IPv6 Reachabilities for TLV")
 
+uint16_t isis_area_ipv6_topology(struct isis_area *area)
+{
+  struct isis_area_mt_setting *area_mt_setting;
+  area_mt_setting = area_lookup_mt_setting(area, ISIS_MT_IPV6_UNICAST);
+
+  if (area_mt_setting && area_mt_setting->enabled)
+    return ISIS_MT_IPV6_UNICAST;
+  return ISIS_MT_IPV4_UNICAST;
+}
+
 /* MT naming api */
 const char *isis_mtid2str(uint16_t mtid)
 {

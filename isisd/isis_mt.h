@@ -89,6 +89,10 @@ struct isis_circuit;
 struct tlvs;
 struct te_is_neigh;
 
+uint16_t isis_area_ipv6_topology(struct isis_area *area);
+
+struct mt_router_info* tlvs_lookup_mt_router_info(struct tlvs *tlvs, uint16_t mtid);
+
 struct tlv_mt_neighbors* tlvs_lookup_mt_neighbors(struct tlvs *tlvs, uint16_t mtid);
 struct tlv_mt_neighbors* tlvs_get_mt_neighbors(struct tlvs *tlvs, uint16_t mtid);
 

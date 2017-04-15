@@ -1345,37 +1345,49 @@ tlv_add_ipv4_ext_reachs (struct list *ipv4_reachs, struct stream *stream)
 }
 
 
-int
-tlv_add_te_ipv4_reachs (struct list *te_ipv4_reachs, struct stream *stream)
+unsigned int
+tlv_add_te_ipv4_reachs (struct list *te_ipv4_reachs, struct stream *stream, void *arg)
 {
   struct listnode *node;
   struct te_ipv4_reachability *te_reach;
   u_char value[255];
   u_char *pos = value;
-  u_char prefix_size;
-  int retval;
+  uint16_t mtid = arg ? *(uint16_t*)arg : ISIS_MT_IPV4_UNICAST;
+  unsigned int consumed = 0;
+  size_t max_size = max_tlv_size(stream);
+
+  if (mtid != ISIS_MT_IPV4_UNICAST)
+    {
+      uint16_t mtid_conversion = ntohs(mtid);
+      memcpy(pos, &mtid_conversion, sizeof(mtid_conversion));
+      pos += sizeof(mtid_conversion);
+    }
 
   for (ALL_LIST_ELEMENTS_RO (te_ipv4_reachs, node, te_reach))
     {
-      prefix_size = ((((te_reach->control & 0x3F) - 1) >> 3) + 1);
+      unsigned char prefixlen = te_reach->control & 0x3F;
 
-      if (pos - value + (5 + prefix_size) > 255)
-	{
-	  retval =
-	    add_tlv (TE_IPV4_REACHABILITY, pos - value, value, stream);
-	  if (retval != ISIS_OK)
-	    return retval;
-	  pos = value;
-	}
+      if ((size_t)(pos - value) + 5 + PSIZE(prefixlen) > max_size)
+        break;
+
       *(u_int32_t *) pos = te_reach->te_metric;
       pos += 4;
       *pos = te_reach->control;
       pos++;
-      memcpy (pos, &te_reach->prefix_start, prefix_size);
-      pos += prefix_size;
+      memcpy (pos, &te_reach->prefix_start, PSIZE(prefixlen));
+      pos += PSIZE(prefixlen);
+      consumed++;
     }
 
-  return add_tlv (TE_IPV4_REACHABILITY, pos - value, value, stream);
+  if (consumed)
+    {
+      int rv = add_tlv ((mtid != ISIS_MT_IPV4_UNICAST) ? MT_IPV4_REACHABILITY
+                                                       : TE_IPV4_REACHABILITY,
+                        pos - value, value, stream);
+      assert(rv == ISIS_OK);
+    }
+
+  return consumed;
 }
 
 int
@@ -1403,36 +1415,49 @@ tlv_add_ipv6_addrs (struct list *ipv6_addrs, struct stream *stream)
   return add_tlv (IPV6_ADDR, pos - value, value, stream);
 }
 
-int
-tlv_add_ipv6_reachs (struct list *ipv6_reachs, struct stream *stream)
+unsigned int
+tlv_add_ipv6_reachs (struct list *ipv6_reachs, struct stream *stream, void *arg)
 {
   struct listnode *node;
   struct ipv6_reachability *ip6reach;
   u_char value[255];
   u_char *pos = value;
-  int retval, prefix_octets;
+  uint16_t mtid = arg ? *(uint16_t*)arg : ISIS_MT_IPV4_UNICAST;
+  unsigned int consumed = 0;
+  size_t max_size = max_tlv_size(stream);
+
+  if (mtid != ISIS_MT_IPV4_UNICAST)
+    {
+      uint16_t mtid_conversion = ntohs(mtid);
+      memcpy(pos, &mtid_conversion, sizeof(mtid_conversion));
+      pos += sizeof(mtid_conversion);
+    }
 
   for (ALL_LIST_ELEMENTS_RO (ipv6_reachs, node, ip6reach))
     {
-      if (pos - value + IPV6_MAX_BYTELEN + 6 > 255)
-	{
-	  retval = add_tlv (IPV6_REACHABILITY, pos - value, value, stream);
-	  if (retval != ISIS_OK)
-	    return retval;
-	  pos = value;
-	}
-      *(uint32_t *) pos = ip6reach->metric;
+      if ((size_t)(pos - value) + 6 + PSIZE(ip6reach->prefix_len) > max_size)
+        break;
+
+      *(uint32_t *)pos = ip6reach->metric;
       pos += 4;
       *pos = ip6reach->control_info;
       pos++;
-      prefix_octets = ((ip6reach->prefix_len + 7) / 8);
       *pos = ip6reach->prefix_len;
       pos++;
-      memcpy (pos, ip6reach->prefix, prefix_octets);
-      pos += prefix_octets;
+      memcpy (pos, ip6reach->prefix, PSIZE(ip6reach->prefix_len));
+      pos += PSIZE(ip6reach->prefix_len);
+      consumed++;
     }
 
-  return add_tlv (IPV6_REACHABILITY, pos - value, value, stream);
+  if (consumed)
+    {
+      int rv = add_tlv ((mtid != ISIS_MT_IPV4_UNICAST) ? MT_IPV6_REACHABILITY
+                                                       : IPV6_REACHABILITY,
+                        pos - value, value, stream);
+      assert(rv == ISIS_OK);
+    }
+
+  return consumed;
 }
 
 int

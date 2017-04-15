@@ -342,9 +342,9 @@ int tlv_add_dynamic_hostname (struct hostname *hostname,
 int tlv_add_lsp_entries (struct list *lsps, struct stream *stream);
 int tlv_add_ipv4_int_reachs (struct list *ipv4_reachs, struct stream *stream);
 int tlv_add_ipv4_ext_reachs (struct list *ipv4_reachs, struct stream *stream);
-int tlv_add_te_ipv4_reachs (struct list *te_ipv4_reachs, struct stream *stream);
+unsigned int tlv_add_te_ipv4_reachs (struct list *te_ipv4_reachs, struct stream *stream, void *arg);
 int tlv_add_ipv6_addrs (struct list *ipv6_addrs, struct stream *stream);
-int tlv_add_ipv6_reachs (struct list *ipv6_reachs, struct stream *stream);
+unsigned int tlv_add_ipv6_reachs (struct list *ipv6_reachs, struct stream *stream, void *arg);
 
 int tlv_add_padding (struct stream *stream);
 

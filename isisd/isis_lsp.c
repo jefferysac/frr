@@ -836,9 +836,6 @@ lsp_print_mt_reach(struct list *list, struct vty *vty,
   struct listnode *node;
   struct te_is_neigh *neigh;
 
-  if (!list)
-    return;
-
   for (ALL_LIST_ELEMENTS_RO (list, node, neigh))
     {
       u_char lspid[255];
@@ -860,6 +857,79 @@ lsp_print_mt_reach(struct list *list, struct vty *vty,
     }
 }
 
+static void
+lsp_print_mt_ipv6_reach(struct list *list, struct vty *vty, uint16_t mtid)
+{
+  struct listnode *node;
+  struct ipv6_reachability *ipv6_reach;
+  struct in6_addr in6;
+  u_char buff[BUFSIZ];
+
+  for (ALL_LIST_ELEMENTS_RO (list, node, ipv6_reach))
+    {
+      memset (&in6, 0, sizeof (in6));
+      memcpy (in6.s6_addr, ipv6_reach->prefix,
+              PSIZE (ipv6_reach->prefix_len));
+      inet_ntop (AF_INET6, &in6, (char *)buff, BUFSIZ);
+      if (mtid == ISIS_MT_IPV4_UNICAST)
+        {
+          if ((ipv6_reach->control_info &
+               CTRL_INFO_DISTRIBUTION) == DISTRIBUTION_INTERNAL)
+            vty_out (vty, "  Metric      : %-8d IPv6-Internal : %s/%d%s",
+                     ntohl (ipv6_reach->metric),
+                     buff, ipv6_reach->prefix_len, VTY_NEWLINE);
+          else
+            vty_out (vty, "  Metric      : %-8d IPv6-External : %s/%d%s",
+                     ntohl (ipv6_reach->metric),
+                     buff, ipv6_reach->prefix_len, VTY_NEWLINE);
+        }
+      else
+        {
+          if ((ipv6_reach->control_info &
+               CTRL_INFO_DISTRIBUTION) == DISTRIBUTION_INTERNAL)
+            vty_out (vty, "  Metric      : %-8d IPv6-MT-Int   : %s/%d %s%s",
+                     ntohl (ipv6_reach->metric),
+                     buff, ipv6_reach->prefix_len,
+                     isis_mtid2str(mtid), VTY_NEWLINE);
+          else
+            vty_out (vty, "  Metric      : %-8d IPv6-MT-Ext   : %s/%d %s%s",
+                     ntohl (ipv6_reach->metric),
+                     buff, ipv6_reach->prefix_len,
+                     isis_mtid2str(mtid), VTY_NEWLINE);
+        }
+    }
+}
+
+static void
+lsp_print_mt_ipv4_reach(struct list *list, struct vty *vty, uint16_t mtid)
+{
+  struct listnode *node;
+  struct te_ipv4_reachability *te_ipv4_reach;
+
+  for (ALL_LIST_ELEMENTS_RO (list, node, te_ipv4_reach))
+    {
+      if (mtid == ISIS_MT_IPV4_UNICAST)
+        {
+          /* FIXME: There should be better way to output this stuff. */
+          vty_out (vty, "  Metric      : %-8d IPv4-Extended : %s/%d%s",
+                   ntohl (te_ipv4_reach->te_metric),
+                   inet_ntoa (newprefix2inaddr (&te_ipv4_reach->prefix_start,
+                                                te_ipv4_reach->control)),
+                   te_ipv4_reach->control & 0x3F, VTY_NEWLINE);
+        }
+      else
+        {
+          /* FIXME: There should be better way to output this stuff. */
+          vty_out (vty, "  Metric      : %-8d IPv4-MT       : %s/%d %s%s",
+                   ntohl (te_ipv4_reach->te_metric),
+                   inet_ntoa (newprefix2inaddr (&te_ipv4_reach->prefix_start,
+                                                te_ipv4_reach->control)),
+                   te_ipv4_reach->control & 0x3F,
+                   isis_mtid2str(mtid), VTY_NEWLINE);
+        }
+    }
+}
+
 void
 lsp_print_detail (struct isis_lsp *lsp, struct vty *vty, char dynhost)
 {
@@ -869,12 +939,10 @@ lsp_print_detail (struct isis_lsp *lsp, struct vty *vty, char dynhost)
   struct is_neigh *is_neigh;
   struct ipv4_reachability *ipv4_reach;
   struct in_addr *ipv4_addr;
-  struct te_ipv4_reachability *te_ipv4_reach;
-  struct ipv6_reachability *ipv6_reach;
   struct mt_router_info *mt_router_info;
+  struct tlv_mt_ipv6_reachs *mt_ipv6_reachs;
   struct tlv_mt_neighbors *mt_is_neigh;
-  struct in6_addr in6;
-  u_char buff[BUFSIZ];
+  struct tlv_mt_ipv4_reachs *mt_ipv4_reachs;
   u_char LSPid[255];
   u_char hostname[255];
   u_char ipv4_reach_prefix[20];
@@ -988,25 +1056,14 @@ lsp_print_detail (struct isis_lsp *lsp, struct vty *vty, char dynhost)
 	       ipv4_reach->metrics.metric_default, ipv4_reach_prefix,
 	       ipv4_reach_mask, VTY_NEWLINE);
     }
-  
+
   /* IPv6 tlv */
-  if (lsp->tlv_data.ipv6_reachs)
-    for (ALL_LIST_ELEMENTS_RO (lsp->tlv_data.ipv6_reachs, lnode, ipv6_reach))
-    {
-      memset (&in6, 0, sizeof (in6));
-      memcpy (in6.s6_addr, ipv6_reach->prefix,
-	      PSIZE (ipv6_reach->prefix_len));
-      inet_ntop (AF_INET6, &in6, (char *)buff, BUFSIZ);
-      if ((ipv6_reach->control_info &
-	   CTRL_INFO_DISTRIBUTION) == DISTRIBUTION_INTERNAL)
-	vty_out (vty, "  Metric      : %-8d IPv6-Internal : %s/%d%s",
-		 ntohl (ipv6_reach->metric),
-		 buff, ipv6_reach->prefix_len, VTY_NEWLINE);
-      else
-	vty_out (vty, "  Metric      : %-8d IPv6-External : %s/%d%s",
-		 ntohl (ipv6_reach->metric),
-		 buff, ipv6_reach->prefix_len, VTY_NEWLINE);
-    }
+  lsp_print_mt_ipv6_reach(lsp->tlv_data.ipv6_reachs, vty,
+                          ISIS_MT_IPV4_UNICAST);
+
+  /* MT IPv6 reachability tlv */
+  for (ALL_LIST_ELEMENTS_RO (lsp->tlv_data.mt_ipv6_reachs, lnode, mt_ipv6_reachs))
+    lsp_print_mt_ipv6_reach(mt_ipv6_reachs->list, vty, mt_ipv6_reachs->mtid);
 
   /* TE IS neighbor tlv */
   lsp_print_mt_reach(lsp->tlv_data.te_is_neighs, vty,
@@ -1017,17 +1074,13 @@ lsp_print_detail (struct isis_lsp *lsp, struct vty *vty, char dynhost)
     lsp_print_mt_reach(mt_is_neigh->list, vty, dynhost, mt_is_neigh->mtid);
 
   /* TE IPv4 tlv */
-  if (lsp->tlv_data.te_ipv4_reachs)
-    for (ALL_LIST_ELEMENTS_RO (lsp->tlv_data.te_ipv4_reachs, lnode,
-			       te_ipv4_reach))
-    {
-      /* FIXME: There should be better way to output this stuff. */
-      vty_out (vty, "  Metric      : %-8d IPv4-Extended : %s/%d%s",
-	       ntohl (te_ipv4_reach->te_metric),
-	       inet_ntoa (newprefix2inaddr (&te_ipv4_reach->prefix_start,
-					    te_ipv4_reach->control)),
-	       te_ipv4_reach->control & 0x3F, VTY_NEWLINE);
-    }
+  lsp_print_mt_ipv4_reach(lsp->tlv_data.te_ipv4_reachs, vty,
+                          ISIS_MT_IPV4_UNICAST);
+
+  /* MT IPv4 reachability tlv */
+  for (ALL_LIST_ELEMENTS_RO (lsp->tlv_data.mt_ipv4_reachs, lnode, mt_ipv4_reachs))
+    lsp_print_mt_ipv4_reach(mt_ipv4_reachs->list, vty, mt_ipv4_reachs->mtid);
+
   vty_out (vty, "%s", VTY_NEWLINE);
 
   return;

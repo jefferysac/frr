@@ -24,6 +24,8 @@
 #ifndef _ZEBRA_ISIS_TLV_H
 #define _ZEBRA_ISIS_TLV_H
 
+#include "isisd/isis_mt.h"
+
 /*
  * The list of TLVs we (should) support.
  * ____________________________________________________________________________

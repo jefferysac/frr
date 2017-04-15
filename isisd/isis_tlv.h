@@ -112,7 +112,9 @@
 #define MT_IS_NEIGHBOURS          222
 #define MT_ROUTER_INFORMATION     229
 #define IPV6_ADDR                 232
+#define MT_IPV4_REACHABILITY      235
 #define IPV6_REACHABILITY         236
+#define MT_IPV6_REACHABILITY      237
 #define WAY3_HELLO                240
 #define ROUTER_INFORMATION        242
 
@@ -280,8 +282,10 @@ struct tlvs
   struct list *ipv4_int_reachs;
   struct list *ipv4_ext_reachs;
   struct list *te_ipv4_reachs;
+  struct list *mt_ipv4_reachs;
   struct list *ipv6_addrs;
   struct list *ipv6_reachs;
+  struct list *mt_ipv6_reachs;
   struct isis_passwd auth_info;
 };
 
